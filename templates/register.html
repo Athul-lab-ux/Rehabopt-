@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabOpt — Register</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .login-wrap {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0A2540 0%, #1A3A5C 50%, #0A2540 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .login-wrap::before {
+            content: "";
+            position: absolute;
+            width: 600px; height: 600px;
+            background: radial-gradient(circle, rgba(0,212,170,0.12) 0%, transparent 70%);
+            top: -200px; right: -200px;
+            border-radius: 50%;
+        }
+        .login-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 48px 40px;
+            width: 420px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 1;
+        }
+        .login-card h1 { font-size: 28px; color: #0A2540; margin-bottom: 6px; }
+        .login-card .subtitle { color: #666; font-size: 14px; margin-bottom: 32px; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+        .brand-icon { width: 48px; height: 48px; background: linear-gradient(135deg, #0A2540, #00D4AA); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .brand-text { font-size: 22px; font-weight: 700; color: #0A2540; }
+        .brand-text span { color: #00D4AA; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; }
+        .form-group input { width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 15px; transition: border-color 0.2s; box-sizing: border-box; }
+        .form-group input:focus { outline: none; border-color: #00D4AA; box-shadow: 0 0 0 3px rgba(0,212,170,0.15); }
+        .btn-primary { width: 100%; padding: 14px; background: linear-gradient(135deg, #0A2540, #1A3A5C); color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(10,37,64,0.3); }
+        .text-link { text-align: center; margin-top: 20px; font-size: 14px; color: #666; }
+        .text-link a { color: #00D4AA; text-decoration: none; font-weight: 600; }
+        .error-msg { background: #FFF0F0; border: 1px solid #FF6B6B; color: #CC3333; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+        .ok-msg { background: #F0FFF4; border: 1px solid #00D4AA; color: #0A7A5A; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+    </style>
+</head>
+<body>
+    <div class="login-wrap">
+        <div class="login-card">
+            <div class="brand">
+                <div class="brand-icon">🩺</div>
+                <div class="brand-text">Rehab<span>Opt</span></div>
+            </div>
+            <h1>Create Account</h1>
+            <p class="subtitle">Register to start your rehabilitation program</p>
+
+            {% if error %}
+            <div class="error-msg">{{ error }}</div>
+            {% endif %}
+            {% if success %}
+            <div class="ok-msg">{{ success }}</div>
+            {% endif %}
+
+            <form method="POST" action="/register">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" name="email" placeholder="name@gmail.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="Min 4 characters" required minlength="4">
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password</label>
+                    <input type="password" name="confirm" placeholder="Re-enter password" required minlength="4">
+                </div>
+                <button type="submit" class="btn-primary">Register →</button>
+            </form>
+
+            <div class="text-link">
+                Already have an account? <a href="/login">Sign in here</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

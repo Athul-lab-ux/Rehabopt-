@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabOpt — Drawing Session</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="topbar">
+        <div class="topbar-brand">🩺 Rehab<span>Opt</span> — Drawing Session</div>
+        <div class="topbar-links">
+            <a href="/dashboard">← Back to Dashboard</a>
+        </div>
+    </div>
+
+    <div class="page-wrap">
+        <div class="exercise-layout">
+            <!-- Left: Drawing controls -->
+            <div class="exercise-sidebar">
+                <h3>Drawing Mode</h3>
+                <div class="drawing-modes">
+                    <button class="mode-btn active" id="btnTrace" onclick="setMode('trace')">📐 Trace Shape</button>
+                    <button class="mode-btn" id="btnCustom" onclick="setMode('custom')">✏️ Custom Drawing</button>
+                </div>
+
+                <div id="traceControls">
+                    <h4>Select Shape</h4>
+                    <div class="shape-grid" id="shapeGrid"></div>
+                </div>
+
+                <div id="customControls" style="display:none">
+                    <h4>Colors</h4>
+                    <div class="color-palette">
+                        <button class="color-btn active" style="background:#00D4AA" onclick="setColor('#00D4AA')"></button>
+                        <button class="color-btn" style="background:#FF7A00" onclick="setColor('#FF7A00')"></button>
+                        <button class="color-btn" style="background:#FF6B6B" onclick="setColor('#FF6B6B')"></button>
+                        <button class="color-btn" style="background:#00E5FF" onclick="setColor('#00E5FF')"></button>
+                        <button class="color-btn" style="background:#FFFF00" onclick="setColor('#FFFF00')"></button>
+                        <button class="color-btn" style="background:#FFFFFF" onclick="setColor('#FFFFFF')"></button>
+                    </div>
+                    <div class="draw-tools">
+                        <button class="tool-btn" id="btnDraw" onclick="startDraw()">✏️ Draw</button>
+                        <button class="tool-btn" id="btnErase" onclick="startErase()">🧹 Erase</button>
+                        <button class="tool-btn" onclick="clearCanvas()">🗑 Clear</button>
+                    </div>
+                </div>
+
+                <div class="draw-actions">
+                    <button class="btn-start" id="btnStartDraw" onclick="startDrawing()">▶ Start</button>
+                    <button class="btn-stop" id="btnStopDraw" onclick="stopDrawing()" style="display:none">⏹ Stop</button>
+                </div>
+
+                <div class="keyboard-hints">
+                    <span><kbd>P</kbd> Pause</span>
+                    <span><kbd>R</kbd> Resume</span>
+                    <span><kbd>Q</kbd> Quit</span>
+                </div>
+            </div>
+
+            <!-- Center: Drawing canvas -->
+            <div class="exercise-main">
+                <div class="video-container drawing-container" id="drawingContainer">
+                    <video id="webcam" autoplay playsinline muted></video>
+                    <canvas id="drawCanvas"></canvas>
+                    <div class="draw-progress" id="drawProgress" style="display:none">
+                        <div class="progress-text" id="progressText">0%</div>
+                    </div>
+                    <div class="camera-placeholder" id="cameraPlaceholder">
+                        <div class="camera-icon">✏️</div>
+                        <p>Select mode and click Start</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Drawing info -->
+            <div class="exercise-right">
+                <div class="kpi-card">
+                    <div class="kpi-label">Mode</div>
+                    <div class="kpi-value" id="kpiMode">Trace</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Shape / Tool</div>
+                    <div class="kpi-value" id="kpiShape">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Progress</div>
+                    <div class="kpi-value" id="kpiProgress">0%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm/vision_bundle.js" crossorigin="anonymous"></script>
+    <script src="/static/math-core.js"></script>
+    <script src="/static/mediapipe-loader.js"></script>
+    <script src="/static/drawing.js"></script>
+
+    <script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('drawCanvas');
+    let drawRunning = false;
+    let drawPaused = false;
+    let startTime = 0;
+
+    // Populate shape grid
+    const shapeGrid = document.getElementById('shapeGrid');
+    DrawingEngine.SHAPES.forEach((s, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'shape-btn';
+        btn.textContent = s.name;
+        btn.onclick = () => { DrawingEngine.nextShape(); /* simplified */ };
+        shapeGrid.appendChild(btn);
+    });
+
+    function setMode(m) {
+        DrawingEngine.setMode(m);
+        document.getElementById('btnTrace').classList.toggle('active', m === 'trace');
+        document.getElementById('btnCustom').classList.toggle('active', m === 'custom');
+        document.getElementById('traceControls').style.display = m === 'trace' ? '' : 'none';
+        document.getElementById('customControls').style.display = m === 'custom' ? '' : 'none';
+        document.getElementById('kpiMode').textContent = m === 'trace' ? 'Trace' : 'Custom';
+    }
+
+    function setColor(c) { DrawingEngine.setColor(c); }
+    function startDraw() { DrawingEngine.startDraw(); }
+    function startErase() { DrawingEngine.startErase(); }
+    function clearCanvas() { DrawingEngine.clearCanvas(); }
+
+    async function startDrawing() {
+        const ok = await MediaPipeLoader.init();
+        if (!ok) { alert('Failed to load MediaPipe models.'); return; }
+
+        DrawingEngine.start(DrawingEngine.getState().mode === 'custom' ? 'custom' : 'trace');
+        drawRunning = true;
+        drawPaused = false;
+        startTime = Date.now();
+
+        document.getElementById('cameraPlaceholder').style.display = 'none';
+        document.getElementById('btnStartDraw').style.display = 'none';
+        document.getElementById('btnStopDraw').style.display = '';
+        document.getElementById('drawProgress').style.display = '';
+
+        await MediaPipeLoader.start(video, onDrawResults);
+    }
+
+    function stopDrawing() {
+        drawRunning = false;
+        MediaPipeLoader.stop(video);
+        DrawingEngine.stop();
+        document.getElementById('cameraPlaceholder').style.display = '';
+        document.getElementById('btnStartDraw').style.display = '';
+        document.getElementById('btnStopDraw').style.display = 'none';
+        document.getElementById('drawProgress').style.display = 'none';
+
+        // Save
+        const st = DrawingEngine.getState();
+        fetch('/api/save_session', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                type: 'drawing',
+                exercise: st.shape || 'Custom',
+                duration: Math.round((Date.now() - startTime) / 1000),
+                score: st.progress,
+            })
+        }).catch(() => {});
+    }
+
+    function onDrawResults(results) {
+        if (!drawRunning || drawPaused) return;
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+
+        // Draw video
+        const ctx2 = canvas.getContext('2d');
+        ctx2.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Overlay skeleton (hand only, no arm)
+        MediaPipeLoader.drawSkeleton(canvas, results, { drawArm: false, drawHand: true });
+
+        // Update drawing engine
+        DrawingEngine.update(results, canvas.width, canvas.height);
+        DrawingEngine.draw(canvas);
+
+        const st = DrawingEngine.getState();
+        document.getElementById('kpiShape').textContent = st.shape || '—';
+        document.getElementById('kpiProgress').textContent = st.progress + '%';
+        document.getElementById('progressText').textContent = st.progress + '%';
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'q' && drawRunning) stopDrawing();
+        if (e.key === 'p' && drawRunning) { drawPaused = true; DrawingEngine.pause(); }
+        if (e.key === 'r' && drawRunning) { drawPaused = false; DrawingEngine.resume(); }
+    });
+    </script>
+</body>
+</html>

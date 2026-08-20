@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabOpt — Settings</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="topbar">
+        <div class="topbar-brand">🩺 Rehab<span>Opt</span> — Settings</div>
+        <div class="topbar-links">
+            <a href="/dashboard">← Back to Dashboard</a>
+        </div>
+    </div>
+
+    <div class="page-wrap">
+        {% if msg %}
+        <div class="ok-msg">{{ msg }}</div>
+        {% endif %}
+
+        <!-- Gemini API Key -->
+        <div class="settings-section">
+            <h2>🤖 Gemini AI Key</h2>
+            <p class="settings-desc">Get your free key from <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a></p>
+            <form method="POST" action="/settings" class="settings-form">
+                <div class="form-group">
+                    <input type="text" name="gemini_key" placeholder="Paste your Gemini API key here..."
+                           value="">
+                </div>
+                <div class="settings-actions">
+                    <button type="submit" name="action" value="save" class="btn-start">💾 Save Key</button>
+                    <button type="submit" name="action" value="delete" class="btn-stop">🗑 Delete Key</button>
+                </div>
+            </form>
+            <div class="settings-status">
+                Status: {% if has_key %}<span class="key-active">✅ Key saved</span>{% else %}<span class="key-inactive">❌ No key set</span>{% endif %}
+            </div>
+        </div>
+
+        <!-- Theme Colors -->
+        <div class="settings-section">
+            <h2>🎨 Theme Colors</h2>
+            <div class="theme-swatches">
+                <button class="swatch active" style="background:#FF7A00" onclick="setTheme('#FF7A00')">Orange</button>
+                <button class="swatch" style="background:#00D4AA" onclick="setTheme('#00D4AA')">Teal</button>
+                <button class="swatch" style="background:#0A2540" onclick="setTheme('#0A2540')">Blue</button>
+                <button class="swatch" style="background:#7C3AED" onclick="setTheme('#7C3AED')">Purple</button>
+                <button class="swatch" style="background:#10B981" onclick="setTheme('#10B981')">Green</button>
+                <button class="swatch" style="background:#EF4444" onclick="setTheme('#EF4444')">Coral</button>
+            </div>
+        </div>
+
+        <!-- About -->
+        <div class="settings-section">
+            <h2>ℹ️ About</h2>
+            <p class="settings-desc">
+                <strong>RehabOpt v2.0</strong> — AI-Powered Webcam Rehabilitation System<br>
+                Uses MediaPipe Pose + Hand tracking with 7 mathematical concepts for upper-limb stroke recovery.
+            </p>
+            <div class="about-features">
+                <span class="chip">🎯 10 Exercises</span>
+                <span class="chip">🎮 9 Games</span>
+                <span class="chip">✏️ 9 Shapes + Custom</span>
+                <span class="chip">📊 7 Math Concepts</span>
+                <span class="chip">🤖 Gemini AI Chat</span>
+                <span class="chip">📥 PDF Reports</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setTheme(color) {
+            document.documentElement.style.setProperty('--accent', color);
+            localStorage.setItem('rehabopt_theme', color);
+            document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+        // Restore saved theme
+        const saved = localStorage.getItem('rehabopt_theme');
+        if (saved) setTheme(saved);
+    </script>
+</body>
+</html>

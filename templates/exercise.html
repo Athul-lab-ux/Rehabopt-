@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabOpt — Exercise Session</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="topbar">
+        <div class="topbar-brand">🩺 Rehab<span>Opt</span> — Exercise Session</div>
+        <div class="topbar-links">
+            <a href="/dashboard">← Back to Dashboard</a>
+        </div>
+    </div>
+
+    <div class="page-wrap">
+        <div class="exercise-layout">
+            <!-- Left: Exercise selector + controls -->
+            <div class="exercise-sidebar">
+                <h3>Select Exercises</h3>
+                <div class="exercise-list">
+                    {% for ex in exercises %}
+                    <label class="exercise-item">
+                        <input type="checkbox" class="ex-cb" value="{{ ex.key }}" data-cat="{{ ex.cat }}"
+                               {% if loop.index <= 3 %}checked{% endif %}>
+                        <span class="ex-name">{{ ex.name }}</span>
+                        <span class="ex-cat">{{ ex.cat }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <div class="exercise-settings">
+                    <label>Reps per set: <input type="number" id="repsTarget" value="10" min="1" max="30"></label>
+                    <label>Sets: <input type="number" id="setsTarget" value="3" min="1" max="10"></label>
+                    <label>Rest (s): <input type="number" id="restTime" value="30" min="5" max="120"></label>
+                </div>
+
+                <button id="btnStart" class="btn-start" onclick="startSession()">▶ Start Session</button>
+                <button id="btnStop" class="btn-stop" onclick="stopSession()" style="display:none">⏹ Stop Session</button>
+
+                <div class="keyboard-hints">
+                    <span><kbd>Q</kbd> Quit</span>
+                    <span><kbd>P</kbd> Pause</span>
+                    <span><kbd>R</kbd> Resume</span>
+                </div>
+            </div>
+
+            <!-- Center: Live video + skeleton -->
+            <div class="exercise-main">
+                <div class="video-container" id="videoContainer">
+                    <video id="webcam" autoplay playsinline muted></video>
+                    <canvas id="skeletonCanvas"></canvas>
+                    <div class="exercise-overlay" id="exerciseOverlay" style="display:none">
+                        <div class="overlay-exercise" id="overlayExercise"></div>
+                        <div class="overlay-step" id="overlayStep"></div>
+                        <div class="overlay-rep" id="overlayRep"></div>
+                        <div class="overlay-feedback" id="overlayFeedback"></div>
+                        <div class="overlay-hint" id="overlayHint"></div>
+                    </div>
+                    <div class="camera-placeholder" id="cameraPlaceholder">
+                        <div class="camera-icon">📷</div>
+                        <p>Click "Start Session" to activate camera</p>
+                    </div>
+                </div>
+
+                <!-- Step images -->
+                <div class="steps-panel" id="stepsPanel" style="display:none">
+                    <h4>Exercise Steps — <span id="currentExName"></span></h4>
+                    <div class="steps-row" id="stepsRow"></div>
+                </div>
+
+                <!-- Live charts -->
+                <div class="charts-grid" id="chartsGrid" style="display:none">
+                    <div class="chart-box">
+                        <h4>Smoothness</h4>
+                        <canvas id="chartSmoothness" width="300" height="120"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <h4>Wrist Speed (px/s)</h4>
+                        <canvas id="chartWristSpeed" width="300" height="120"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <h4>Elbow Angle (°)</h4>
+                        <canvas id="chartElbow" width="300" height="120"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <h4>Tremor FFT (Hz)</h4>
+                        <canvas id="chartTremor" width="300" height="120"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Live metrics + guide skeleton -->
+            <div class="exercise-right">
+                <div class="kpi-card">
+                    <div class="kpi-label">Exercise</div>
+                    <div class="kpi-value" id="kpiExercise">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Set</div>
+                    <div class="kpi-value" id="kpiSet">0 / 3</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Reps</div>
+                    <div class="kpi-value" id="kpiReps">0 / 10</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Current Step</div>
+                    <div class="kpi-value" id="kpiStep" style="font-size:14px">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Elbow Angle</div>
+                    <div class="kpi-value" id="kpiElbow">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Smoothness</div>
+                    <div class="kpi-value" id="kpiSmoothness">—</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MediaPipe from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm/vision_bundle.js" crossorigin="anonymous"></script>
+
+    <!-- App scripts -->
+    <script src="/static/math-core.js"></script>
+    <script src="/static/mediapipe-loader.js"></script>
+    <script src="/static/exercise.js"></script>
+
+    <script>
+    /* ==========================================================
+       Exercise Session — Browser-side MediaPipe
+       ========================================================== */
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('skeletonCanvas');
+    const ctx = canvas.getContext('2d');
+    let sessionRunning = false;
+    let sessionPaused = false;
+    let sessionData = { rep_metrics: [], start_time: 0 };
+
+    // Init canvas size
+    function resizeCanvas() {
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+    }
+
+    // Start session
+    async function startSession() {
+        // Get selected exercises
+        const checked = [...document.querySelectorAll('.ex-cb:checked')].map(cb => cb.value);
+        if (checked.length === 0) { alert('Select at least one exercise'); return; }
+
+        // Init MediaPipe
+        const ok = await MediaPipeLoader.init();
+        if (!ok) { alert('Failed to load MediaPipe models. Check your internet connection.'); return; }
+
+        // Reset exercise engine
+        ExerciseEngine.reset(checked, {
+            reps: parseInt(document.getElementById('repsTarget').value) || 10,
+            sets: parseInt(document.getElementById('setsTarget').value) || 3,
+            rest: parseInt(document.getElementById('restTime').value) || 30,
+        });
+
+        sessionData = { rep_metrics: [], start_time: Date.now() };
+        sessionRunning = true;
+        sessionPaused = false;
+
+        // UI
+        document.getElementById('btnStart').style.display = 'none';
+        document.getElementById('btnStop').style.display = '';
+        document.getElementById('cameraPlaceholder').style.display = 'none';
+        document.getElementById('exerciseOverlay').style.display = '';
+        document.getElementById('stepsPanel').style.display = '';
+        document.getElementById('chartsGrid').style.display = '';
+
+        // Start camera + detection
+        await MediaPipeLoader.start(video, onResults);
+    }
+
+    // Stop session
+    async function stopSession() {
+        sessionRunning = false;
+        MediaPipeLoader.stop(video);
+        document.getElementById('btnStart').style.display = '';
+        document.getElementById('btnStop').style.display = 'none';
+        document.getElementById('exerciseOverlay').style.display = 'none';
+        document.getElementById('stepsPanel').style.display = 'none';
+        document.getElementById('chartsGrid').style.display = 'none';
+        document.getElementById('cameraPlaceholder').style.display = '';
+
+        // Save session to server
+        const st = ExerciseEngine.getState();
+        if (sessionData.rep_metrics.length > 0) {
+            const duration = Math.round((Date.now() - sessionData.start_time) / 1000);
+            fetch('/api/save_session', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    type: 'exercise',
+                    exercise: st.exercise || 'Mixed',
+                    duration: duration,
+                    reps: st.rep,
+                    sets: st.set,
+                    rep_logs: sessionData.rep_metrics,
+                })
+            }).catch(() => {});
+        }
+    }
+
+    // MediaPipe results callback
+    function onResults(results) {
+        if (!sessionRunning || sessionPaused) return;
+        resizeCanvas();
+
+        // Draw skeleton
+        const st = ExerciseEngine.getState();
+        const showArm = st.skeleton === 'arm';
+        MediaPipeLoader.drawSkeleton(canvas, results, {
+            drawArm: true,
+            drawHand: true,
+            drawAngles: showArm,
+            angles: {
+                13: ExerciseEngine.getElbowAngle(results),
+                15: ExerciseEngine.getWristAngle(results),
+            }
+        });
+
+        // Update exercise engine
+        const fps = 30;
+        ExerciseEngine.update(results, fps);
+        const newState = ExerciseEngine.getState();
+
+        // Update UI
+        updateUI(newState);
+
+        // Record history for charts
+        sessionData.rep_metrics = newState.rep_log || [];
+        drawCharts(newState);
+    }
+
+    // Update UI elements
+    function updateUI(st) {
+        document.getElementById('kpiExercise').textContent = st.exercise || '—';
+        document.getElementById('kpiSet').textContent = `${st.set || 0} / ${st.sets_target || 3}`;
+        document.getElementById('kpiReps').textContent = `${st.rep || 0} / ${st.reps_target || 10}`;
+        document.getElementById('kpiStep').textContent = st.step_name || '—';
+        document.getElementById('kpiElbow').textContent = st.elbow ? Math.round(st.elbow) + '°' : '—';
+        document.getElementById('kpiSmoothness').textContent = st.rep_log && st.rep_log.length > 0 ?
+            st.rep_log[st.rep_log.length - 1].smoothness + '/100' : '—';
+
+        // Overlay
+        document.getElementById('overlayExercise').textContent = st.exercise || '';
+        document.getElementById('overlayStep').textContent = st.step_name ? `Step: ${st.step_name}` : '';
+        document.getElementById('overlayRep').textContent = `Rep ${st.rep || 0} / ${st.reps_target || 10}`;
+        document.getElementById('overlayFeedback').textContent = st.feedback || '';
+        document.getElementById('overlayHint').textContent = st.hint || '';
+
+        // Current exercise name in steps panel
+        document.getElementById('currentExName').textContent = st.exercise || '';
+
+        // Show step boxes
+        if (st.steps && st.steps.length > 0) {
+            const row = document.getElementById('stepsRow');
+            row.innerHTML = '';
+            st.steps.forEach((step, i) => {
+                const box = document.createElement('div');
+                box.className = 'step-box' + (i === st.step_idx ? ' active' : '') + (i < st.step_idx ? ' done' : '');
+                box.textContent = `${i + 1}. ${step}`;
+                row.appendChild(box);
+            });
+        }
+
+        // Phase: done
+        if (st.phase === 'done' && sessionRunning) {
+            document.getElementById('overlayFeedback').textContent = 'Session Complete! 🎉';
+            setTimeout(() => stopSession(), 2000);
+        }
+    }
+
+    // Draw simple line charts
+    function drawCharts(st) {
+        const logs = st.rep_log || [];
+        if (logs.length < 1) return;
+
+        drawLine('chartSmoothness', logs.map(l => l.smoothness), '#00D4AA', 0, 100);
+        drawLine('chartWristSpeed', logs.map(l => l.speed), '#FF7A00', 0);
+        drawLine('chartElbow', logs.map(l => l.rom), '#00E5FF', 0, 180);
+        drawLine('chartTremor', logs.map(l => l.tremor_hz), '#FF6B6B', 0, 20);
+    }
+
+    function drawLine(canvasId, values, color, minV, maxV) {
+        const c = document.getElementById(canvasId);
+        if (!c) return;
+        const ctx2 = c.getContext('2d');
+        const W = c.width, H = c.height;
+        ctx2.clearRect(0, 0, W, H);
+
+        // Grid
+        ctx2.strokeStyle = '#eee';
+        ctx2.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = (H - 20) * i / 4 + 10;
+            ctx2.beginPath(); ctx2.moveTo(40, y); ctx2.lineTo(W - 10, y); ctx2.stroke();
+        }
+
+        if (values.length < 1) return;
+        if (!maxV) maxV = Math.max(...values) * 1.2 || 100;
+        if (!minV && minV !== 0) minV = Math.min(...values) * 0.8;
+
+        ctx2.strokeStyle = color;
+        ctx2.lineWidth = 2;
+        ctx2.beginPath();
+        values.forEach((v, i) => {
+            const x = 40 + (W - 50) * i / Math.max(values.length - 1, 1);
+            const y = H - 20 - ((v - minV) / (maxV - minV)) * (H - 30);
+            i === 0 ? ctx2.moveTo(x, y) : ctx2.lineTo(x, y);
+        });
+        ctx2.stroke();
+
+        // Latest value
+        const last = values[values.length - 1];
+        ctx2.fillStyle = color;
+        ctx2.font = 'bold 12px Segoe UI';
+        ctx2.fillText(Math.round(last), W - 35, 15);
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+        if (e.key === 'q' && sessionRunning) stopSession();
+        if (e.key === 'p' && sessionRunning) { sessionPaused = true; }
+        if (e.key === 'r' && sessionRunning) { sessionPaused = false; }
+    });
+    </script>
+</body>
+</html>

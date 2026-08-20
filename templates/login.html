@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabOpt — Login</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* ---- Login-specific styles ---- */
+        .login-wrap {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0A2540 0%, #1A3A5C 50%, #0A2540 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .login-wrap::before {
+            content: "";
+            position: absolute;
+            width: 600px; height: 600px;
+            background: radial-gradient(circle, rgba(0,212,170,0.12) 0%, transparent 70%);
+            top: -200px; right: -200px;
+            border-radius: 50%;
+            animation: float 8s ease-in-out infinite;
+        }
+        .login-wrap::after {
+            content: "";
+            position: absolute;
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(255,122,0,0.1) 0%, transparent 70%);
+            bottom: -150px; left: -150px;
+            border-radius: 50%;
+            animation: float 10s ease-in-out infinite reverse;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-30px); }
+        }
+        .login-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 48px 40px;
+            width: 420px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 1;
+        }
+        .login-card h1 {
+            font-size: 28px;
+            color: #0A2540;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+        .login-card .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+        .login-card .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .login-card .brand-icon {
+            width: 48px; height: 48px;
+            background: linear-gradient(135deg, #0A2540, #00D4AA);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .login-card .brand-text {
+            font-size: 22px;
+            font-weight: 700;
+            color: #0A2540;
+        }
+        .login-card .brand-text span {
+            color: #00D4AA;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #00D4AA;
+            box-shadow: 0 0 0 3px rgba(0,212,170,0.15);
+        }
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #0A2540, #1A3A5C);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            margin-top: 8px;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(10,37,64,0.3);
+        }
+        .text-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        .text-link a {
+            color: #00D4AA;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .error-msg {
+            background: #FFF0F0;
+            border: 1px solid #FF6B6B;
+            color: #CC3333;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+        .ok-msg {
+            background: #F0FFF4;
+            border: 1px solid #00D4AA;
+            color: #0A7A5A;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+        .features {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .features .feat {
+            flex: 1;
+            text-align: center;
+            font-size: 11px;
+            color: #888;
+        }
+        .features .feat-icon {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrap">
+        <div class="login-card">
+            <div class="brand">
+                <div class="brand-icon">🩺</div>
+                <div class="brand-text">Rehab<span>Opt</span></div>
+            </div>
+            <h1>Welcome Back</h1>
+            <p class="subtitle">Sign in to continue your rehabilitation journey</p>
+
+            {% if error %}
+            <div class="error-msg">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST" action="/login">
+                <div class="form-group">
+                    <label>Patient ID</label>
+                    <input type="text" name="patient_id" placeholder="SP-000000001" required
+                           pattern="SP-\d{9}" title="Format: SP-XXXXXXXXX">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="btn-primary">Sign In →</button>
+            </form>
+
+            <div class="text-link">
+                Don't have an account? <a href="/register">Register here</a>
+            </div>
+
+            <div class="features">
+                <div class="feat"><div class="feat-icon">🎯</div>10 Exercises</div>
+                <div class="feat"><div class="feat-icon">🎮</div>9 Games</div>
+                <div class="feat"><div class="feat-icon">✏️</div>Drawing</div>
+                <div class="feat"><div class="feat-icon">📊</div>Reports</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

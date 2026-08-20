@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabOpt — Game Session</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="topbar">
+        <div class="topbar-brand">🩺 Rehab<span>Opt</span> — Game Session</div>
+        <div class="topbar-links">
+            <a href="/dashboard">← Back to Dashboard</a>
+        </div>
+    </div>
+
+    <div class="page-wrap">
+        <div class="exercise-layout">
+            <!-- Left: Game selector -->
+            <div class="exercise-sidebar">
+                <h3>Select a Game</h3>
+                <div class="game-list">
+                    {% for num, info in games.items() %}
+                    <button class="game-btn" data-game="{{ num }}" onclick="selectGame({{ num }})">
+                        {{ num }}. {{ info.name }}
+                    </button>
+                    {% endfor %}
+                </div>
+
+                <div class="game-controls" id="gameControls" style="display:none">
+                    <button class="btn-start" onclick="startGame()">▶ Start Game</button>
+                    <button class="btn-stop" onclick="stopGame()">⏹ Stop</button>
+                    <div class="speed-controls">
+                        <button onclick="changeSpeed(-0.5)">🐢 Slower</button>
+                        <span id="speedDisplay">1.0x</span>
+                        <button onclick="changeSpeed(0.5)">🚀 Faster</button>
+                    </div>
+                </div>
+
+                <div class="keyboard-hints">
+                    <span><kbd>P</kbd> Pause</span>
+                    <span><kbd>R</kbd> Resume</span>
+                    <span><kbd>Q</kbd> Quit</span>
+                </div>
+            </div>
+
+            <!-- Center: Game canvas + video -->
+            <div class="exercise-main">
+                <div class="video-container game-container" id="videoContainer">
+                    <video id="webcam" autoplay playsinline muted></video>
+                    <canvas id="gameCanvas"></canvas>
+                    <div class="game-overlay" id="gameOverlay" style="display:none">
+                        <div class="game-score" id="gameScore">Score: 0</div>
+                        <div class="game-lives" id="gameLives">❤️❤️❤️</div>
+                    </div>
+                    <div class="camera-placeholder" id="cameraPlaceholder">
+                        <div class="camera-icon">🎮</div>
+                        <p>Select a game and click Start</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Game info -->
+            <div class="exercise-right">
+                <div class="kpi-card">
+                    <div class="kpi-label">Selected Game</div>
+                    <div class="kpi-value" id="kpiGame">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Score</div>
+                    <div class="kpi-value" id="kpiScore">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Lives</div>
+                    <div class="kpi-value" id="kpiLives">3</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Speed</div>
+                    <div class="kpi-value" id="kpiSpeed">1.0x</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm/vision_bundle.js" crossorigin="anonymous"></script>
+    <script src="/static/math-core.js"></script>
+    <script src="/static/mediapipe-loader.js"></script>
+    <script src="/static/exercise.js"></script>
+    <script src="/static/games.js"></script>
+
+    <script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx2d = canvas.getContext('2d');
+    let gameRunning = false;
+    let gamePaused = false;
+    let selectedGame = 0;
+    let startTime = 0;
+
+    function selectGame(num) {
+        selectedGame = num;
+        document.querySelectorAll('.game-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelector(`[data-game="${num}"]`).classList.add('selected');
+        document.getElementById('kpiGame').textContent = GamesEngine.GAMES[num].name;
+        document.getElementById('gameControls').style.display = '';
+    }
+
+    async function startGame() {
+        if (!selectedGame) { alert('Select a game first'); return; }
+        const ok = await MediaPipeLoader.init();
+        if (!ok) { alert('Failed to load MediaPipe models.'); return; }
+
+        GamesEngine.startGame(selectedGame);
+        gameRunning = true;
+        gamePaused = false;
+        startTime = Date.now();
+
+        document.getElementById('cameraPlaceholder').style.display = 'none';
+        document.getElementById('gameOverlay').style.display = '';
+
+        await MediaPipeLoader.start(video, onGameResults);
+    }
+
+    function stopGame() {
+        gameRunning = false;
+        MediaPipeLoader.stop(video);
+        GamesEngine.stopGame();
+        document.getElementById('cameraPlaceholder').style.display = '';
+        document.getElementById('gameOverlay').style.display = 'none';
+        document.getElementById('gameControls').style.display = 'none';
+
+        // Save to server
+        const gs = GamesEngine.getState();
+        if (gs.score > 0) {
+            fetch('/api/save_session', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    type: 'game',
+                    exercise: GamesEngine.GAMES[selectedGame].name,
+                    duration: Math.round((Date.now() - startTime) / 1000),
+                    score: gs.score,
+                })
+            }).catch(() => {});
+        }
+    }
+
+    function onGameResults(results) {
+        if (!gameRunning || gamePaused) return;
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+
+        ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+        ctx2d.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        GamesEngine.process(results, canvas.width, canvas.height);
+        GamesEngine.draw(ctx2d, canvas.width, canvas.height);
+
+        const gs = GamesEngine.getState();
+        document.getElementById('gameScore').textContent = `Score: ${gs.score}`;
+        document.getElementById('gameLives').textContent = '❤️'.repeat(gs.lives);
+        document.getElementById('kpiScore').textContent = gs.score;
+        document.getElementById('kpiLives').textContent = gs.lives;
+    }
+
+    function changeSpeed(delta) {
+        const gs = GamesEngine.getState();
+        const newSpeed = Math.max(0.5, Math.min(3.0, gs.speed + delta));
+        GamesEngine.setSpeed(newSpeed);
+        document.getElementById('speedDisplay').textContent = newSpeed.toFixed(1) + 'x';
+        document.getElementById('kpiSpeed').textContent = newSpeed.toFixed(1) + 'x';
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'q' && gameRunning) stopGame();
+        if (e.key === 'p' && gameRunning) { gamePaused = true; GamesEngine.pause(); }
+        if (e.key === 'r' && gameRunning) { gamePaused = false; GamesEngine.resume(); }
+    });
+    </script>
+</body>
+</html>

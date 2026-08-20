@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabOpt — Reports</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="topbar">
+        <div class="topbar-brand">🩺 Rehab<span>Opt</span> — Reports</div>
+        <div class="topbar-links">
+            <a href="/dashboard">← Back to Dashboard</a>
+            <a href="/report/pdf" class="btn-pdf" target="_blank">📥 Download PDF</a>
+        </div>
+    </div>
+
+    <div class="page-wrap">
+        <h2 class="section-title">Session History — {{ user.patient_id }}</h2>
+
+        {% if not sessions %}
+        <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <p>No sessions completed yet. Start exercising to see your progress!</p>
+        </div>
+        {% else %}
+        <div class="report-table-wrap">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Exercise</th>
+                        <th>Duration</th>
+                        <th>Reps</th>
+                        <th>Sets</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sessions %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ s.date[:10] if s.date else '—' }}</td>
+                        <td><span class="badge badge-{{ s.session_type }}">{{ s.session_type }}</span></td>
+                        <td>{{ s.exercise or '—' }}</td>
+                        <td>{{ (s.duration_s|int // 60) }}m {{ (s.duration_s|int % 60) }}s</td>
+                        <td>{{ s.reps_done }}</td>
+                        <td>{{ s.sets_done }}</td>
+                        <td>{{ s.score|int }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Rep logs for exercise sessions -->
+        {% for s in sessions %}
+            {% if s.session_type == 'exercise' and rep_logs.get(s.id) %}
+            <div class="report-detail">
+                <h3>{{ s.exercise }} — {{ s.date[:10] }}</h3>
+                <table class="report-table small">
+                    <thead>
+                        <tr><th>Rep</th><th>ROM</th><th>Smoothness</th><th>Speed</th><th>Tremor</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for r in rep_logs[s.id] %}
+                        <tr>
+                            <td>{{ r.rep_no }}</td>
+                            <td>{{ r.rom|int }}°</td>
+                            <td>{{ r.smoothness }}/100</td>
+                            <td>{{ r.speed|int }} px/s</td>
+                            <td>{{ r.tremor_hz }} Hz</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        {% endfor %}
+        {% endif %}
+    </div>
+</body>
+</html>

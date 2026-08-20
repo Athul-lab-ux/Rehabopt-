@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabOpt — Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <div class="topbar">
+        <div class="topbar-brand">🩺 Rehab<span>Opt</span></div>
+        <div class="topbar-links">
+            <a href="/dashboard" class="active">Dashboard</a>
+            <a href="/report">Reports</a>
+            <a href="/settings">⚙️ Settings</a>
+            <a href="/logout" class="logout-btn">Logout</a>
+        </div>
+    </div>
+
+    <div class="page-wrap">
+        <!-- Welcome Banner -->
+        <div class="welcome-banner">
+            <div class="welcome-text">
+                <h1>WELCOME BACK</h1>
+                <p>Patient: <strong>{{ user.patient_id }}</strong> &nbsp;|&nbsp; Streak: <strong>🔥 {{ user.streak }} days</strong></p>
+            </div>
+            <div class="recovery-gauge">
+                <div class="gauge-ring">
+                    <svg viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#e0e0e0" stroke-width="10"/>
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#00D4AA" stroke-width="10"
+                                stroke-dasharray="{{ recovery * 3.14 }} 314"
+                                stroke-dashoffset="78.5" stroke-linecap="round"/>
+                    </svg>
+                    <div class="gauge-value">{{ recovery }}%</div>
+                    <div class="gauge-label">Recovery</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Cards -->
+        <h2 class="section-title">Sessions</h2>
+        <div class="session-grid">
+            <a href="/exercise" class="session-card card-exercise">
+                <div class="card-icon">🎯</div>
+                <div class="card-title">Exercise Session</div>
+                <div class="card-desc">10 guided exercises with step-locked reps</div>
+                <div class="card-arrow">→</div>
+            </a>
+            <a href="/game" class="session-card card-game">
+                <div class="card-icon">🎮</div>
+                <div class="card-title">Game Session</div>
+                <div class="card-desc">9 hand-driven rehabilitation games</div>
+                <div class="card-arrow">→</div>
+            </a>
+            <a href="/drawing" class="session-card card-drawing">
+                <div class="card-icon">✏️</div>
+                <div class="card-title">Drawing Session</div>
+                <div class="card-desc">9 shapes + custom canvas</div>
+                <div class="card-arrow">→</div>
+            </a>
+            <div class="session-card card-soon">
+                <div class="card-icon">🏋️</div>
+                <div class="card-title">Upper Body Exercises</div>
+                <div class="card-desc">Coming in Final Review</div>
+                <div class="card-arrow">🔜</div>
+            </div>
+        </div>
+
+        <!-- AI Chat -->
+        <h2 class="section-title">🤖 AI Assistant — Rehab</h2>
+        <div class="chat-section">
+            <div class="chat-box" id="chatBox">
+                <div class="chat-msg bot">Hello! I'm your personal rehabilitation assistant. Ask me anything about exercises, games, or recovery tips.</div>
+            </div>
+            <div class="chat-input-row">
+                <input type="text" id="chatInput" placeholder="Type a message..." maxlength="2000">
+                <label class="chat-upload-btn" title="Upload file">
+                    📎
+                    <input type="file" id="chatFile" accept=".png,.jpg,.jpeg,.webp,.pdf,.pptx,.ppt,.txt,.md" hidden>
+                </label>
+                <button onclick="sendChat()" class="chat-send-btn">Send</button>
+            </div>
+            <div id="chatStatus" class="chat-status"></div>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chatBox');
+        const chatInput = document.getElementById('chatInput');
+        const chatFile = document.getElementById('chatFile');
+        const chatStatus = document.getElementById('chatStatus');
+
+        chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+        chatFile.addEventListener('change', async () => {
+            const file = chatFile.files[0];
+            if (!file) return;
+            chatStatus.textContent = 'Uploading...';
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('prompt', 'Identify this file and give rehabilitation guidance. Max ~120 words.');
+            try {
+                const r = await fetch('/api/chat_file', { method: 'POST', body: fd });
+                const d = await r.json();
+                addMsg(d.reply, 'bot');
+            } catch(e) {
+                addMsg('Upload failed. Try again.', 'bot');
+            }
+            chatStatus.textContent = '';
+            chatFile.value = '';
+        });
+
+        async function sendChat() {
+            const msg = chatInput.value.trim();
+            if (!msg) return;
+            addMsg(msg, 'user');
+            chatInput.value = '';
+            chatStatus.textContent = 'Thinking...';
+            try {
+                const r = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: msg})
+                });
+                const d = await r.json();
+                addMsg(d.reply, 'bot');
+            } catch(e) {
+                addMsg('Error connecting to AI.', 'bot');
+            }
+            chatStatus.textContent = '';
+        }
+
+        function addMsg(text, cls) {
+            const div = document.createElement('div');
+            div.className = 'chat-msg ' + cls;
+            div.textContent = text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
