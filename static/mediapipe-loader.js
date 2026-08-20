@@ -1,7 +1,7 @@
 /* ================================================================
-   REHABOPT — mediapipe-loader.js (FIXED)
+   REHABOPT — mediapipe-loader.js
    Browser-side MediaPipe Pose + Hand landmark detection.
-   Uses @mediapipe/tasks-vision (WASM in browser).
+   Uses @mediapipe/tasks-vision 0.10.14 (WASM in browser).
    ================================================================ */
 
 const MediaPipeLoader = (() => {
@@ -28,26 +28,34 @@ const MediaPipeLoader = (() => {
         try {
             console.log("[MediaPipe] Initializing...");
 
-            // Check if FilesetResolver is available
-            if (typeof window.FilesetResolver === 'undefined') {
-                console.error("[MediaPipe] FilesetResolver not found. Script may not have loaded.");
-                // Try dynamic import
-                await loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18");
-                await sleep(500);
-            }
+            // Check if vision globals are loaded from CDN script
+            const hasFilesetResolver = typeof window.FilesetResolver !== 'undefined';
+            const hasPoseLandmarker = typeof window.PoseLandmarker !== 'undefined';
+            const hasHandLandmarker = typeof window.HandLandmarker !== 'undefined';
 
-            if (typeof window.FilesetResolver === 'undefined') {
-                console.error("[MediaPipe] Still no FilesetResolver after reload");
-                return false;
+            console.log("[MediaPipe] FilesetResolver:", hasFilesetResolver,
+                        "PoseLandmarker:", hasPoseLandmarker,
+                        "HandLandmarker:", hasHandLandmarker);
+
+            if (!hasFilesetResolver) {
+                console.error("[MediaPipe] vision_bundle.js not loaded! Trying dynamic load...");
+                await loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js");
+                await sleep(1000);
+                if (typeof window.FilesetResolver === 'undefined') {
+                    console.error("[MediaPipe] Still no FilesetResolver after dynamic load");
+                    return false;
+                }
             }
 
             // Load WASM files
+            console.log("[MediaPipe] Loading WASM...");
             const vision = await window.FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm"
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
             );
-            console.log("[MediaPipe] WASM loaded");
+            console.log("[MediaPipe] WASM loaded OK");
 
             // Pose landmarker
+            console.log("[MediaPipe] Loading pose model...");
             poseLandmarker = await window.PoseLandmarker.createFromOptions(vision, {
                 baseOptions: {
                     modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task",
@@ -58,9 +66,10 @@ const MediaPipeLoader = (() => {
                 minPoseDetectionConfidence: 0.5,
                 minTrackingConfidence: 0.5,
             });
-            console.log("[MediaPipe] Pose model loaded");
+            console.log("[MediaPipe] Pose model loaded OK");
 
             // Hand landmarker
+            console.log("[MediaPipe] Loading hand model...");
             handLandmarker = await window.HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
                     modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
@@ -71,11 +80,12 @@ const MediaPipeLoader = (() => {
                 minHandDetectionConfidence: 0.5,
                 minTrackingConfidence: 0.5,
             });
-            console.log("[MediaPipe] Hand model loaded");
+            console.log("[MediaPipe] Hand model loaded OK");
 
             return true;
         } catch (err) {
-            console.error("[MediaPipe] GPU failed, trying CPU:", err);
+            console.error("[MediaPipe] GPU failed:", err.message);
+            console.log("[MediaPipe] Trying CPU fallback...");
             return await initCPU();
         }
     }
@@ -84,7 +94,7 @@ const MediaPipeLoader = (() => {
     async function initCPU() {
         try {
             const vision = await window.FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm"
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
             );
 
             poseLandmarker = await window.PoseLandmarker.createFromOptions(vision, {
@@ -105,10 +115,10 @@ const MediaPipeLoader = (() => {
                 numHands: 1,
             });
 
-            console.log("[MediaPipe] CPU fallback loaded");
+            console.log("[MediaPipe] CPU fallback loaded OK");
             return true;
         } catch (err2) {
-            console.error("[MediaPipe] CPU also failed:", err2);
+            console.error("[MediaPipe] CPU also failed:", err2.message);
             return false;
         }
     }
@@ -119,8 +129,8 @@ const MediaPipeLoader = (() => {
             const s = document.createElement('script');
             s.src = src;
             s.crossOrigin = 'anonymous';
-            s.onload = resolve;
-            s.onerror = reject;
+            s.onload = () => { console.log("[MediaPipe] Dynamic script loaded:", src); resolve(); };
+            s.onerror = (e) => { console.error("[MediaPipe] Dynamic script failed:", src, e); reject(e); };
             document.head.appendChild(s);
         });
     }
