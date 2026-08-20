@@ -28,8 +28,15 @@ from flask import (Flask, Response, jsonify, redirect, render_template,
 
 from config import get_config
 import database as db
-from modules import gemini_chat
-from modules.report import generate_daily_pdf
+try:
+    from modules import gemini_chat
+except ImportError:
+    gemini_chat = None
+
+try:
+    from modules.report import generate_daily_pdf
+except ImportError:
+    generate_daily_pdf = None
 
 # ------------------------------------------------------------------
 # Logging
@@ -214,12 +221,14 @@ def settings_page():
         action = request.form.get("action", "save")
         if action == "delete":
             db.set_setting("gemini_key", "")
-            gemini_chat.configure("")
+            if gemini_chat:
+                gemini_chat.configure("")
             msg = "API key deleted"
         else:
             key = request.form.get("gemini_key", "").strip()
             db.set_setting("gemini_key", key)
-            gemini_chat.configure(key)
+            if gemini_chat:
+                gemini_chat.configure(key)
             msg = "API key saved" if key else "API key cleared"
     return render_template("settings.html", msg=msg,
                            has_key=bool(db.get_setting("gemini_key")))
@@ -242,6 +251,8 @@ UPLOAD_DIR = os.path.join(db.DATA_DIR, "uploads")
 @rate_limit(max_requests=30, window=60)
 def api_chat():
     try:
+        if not gemini_chat:
+            return jsonify({"reply": "AI Chat not available. Add Gemini API key in Settings."})
         data = request.get_json(silent=True) or {}
         msg = (data.get("message") or "").strip()
         if not msg:
@@ -261,6 +272,8 @@ def api_chat():
 @app.route("/api/chat_file", methods=["POST"])
 @login_required
 def api_chat_file():
+    if not gemini_chat:
+        return jsonify({"reply": "AI Chat not available. Add Gemini API key in Settings."})
     f = request.files.get("file")
     if f is None or not f.filename:
         return jsonify({"reply": "No file received."})
@@ -391,9 +404,11 @@ def api_state():
 # ==================================================================
 if __name__ == "__main__":
     key = db.get_setting("gemini_key") or config.GEMINI_API_KEY
-    if key:
+    if key and gemini_chat:
         gemini_chat.configure(key)
         logger.info("Gemini AI configured")
+    elif not gemini_chat:
+        logger.warning("Gemini module not installed — AI chat disabled")
 
     logger.info("=" * 50)
     logger.info("  REHABOPT v2 (Browser-Side)  ->  http://%s:%s", config.HOST, config.PORT)
