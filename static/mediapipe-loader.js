@@ -1,7 +1,8 @@
 /* ================================================================
    REHABOPT — mediapipe-loader.js
    Browser-side MediaPipe Pose + Hand landmark detection.
-   Uses @mediapipe/tasks-vision 0.10.14 (WASM in browser).
+   Self-hosted — no external CDN dependencies.
+   Uses dynamic import() for ES module vision_bundle.mjs
    ================================================================ */
 
 const MediaPipeLoader = (() => {
@@ -22,41 +23,26 @@ const MediaPipeLoader = (() => {
     };
 
     // =================================================================
-    // Initialize MediaPipe models
+    // Initialize MediaPipe models using dynamic import
     // =================================================================
     async function init() {
         try {
-            console.log("[MediaPipe] Initializing...");
+            console.log("[MediaPipe] Initializing from self-hosted files...");
 
-            // Check if vision globals are loaded from CDN script
-            const hasFilesetResolver = typeof window.FilesetResolver !== 'undefined';
-            const hasPoseLandmarker = typeof window.PoseLandmarker !== 'undefined';
-            const hasHandLandmarker = typeof window.HandLandmarker !== 'undefined';
+            // Dynamically import the ES module
+            const vision = await import('/static/mediapipe/vision_bundle.mjs');
+            const { FilesetResolver, PoseLandmarker, HandLandmarker } = vision;
 
-            console.log("[MediaPipe] FilesetResolver:", hasFilesetResolver,
-                        "PoseLandmarker:", hasPoseLandmarker,
-                        "HandLandmarker:", hasHandLandmarker);
-
-            if (!hasFilesetResolver) {
-                console.error("[MediaPipe] vision_bundle.js not loaded! Trying dynamic load...");
-                await loadScript("/static/mediapipe/vision_bundle.mjs");
-                await sleep(1000);
-                if (typeof window.FilesetResolver === 'undefined') {
-                    console.error("[MediaPipe] Still no FilesetResolver after dynamic load");
-                    return false;
-                }
-            }
-
-            // Load WASM files
+            // Load WASM files from local server
             console.log("[MediaPipe] Loading WASM...");
-            const vision = await window.FilesetResolver.forVisionTasks(
+            const fileset = await FilesetResolver.forVisionTasks(
                 "/static/mediapipe/wasm"
             );
             console.log("[MediaPipe] WASM loaded OK");
 
             // Pose landmarker
             console.log("[MediaPipe] Loading pose model...");
-            poseLandmarker = await window.PoseLandmarker.createFromOptions(vision, {
+            poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
                 baseOptions: {
                     modelAssetPath: "/static/mediapipe/models/pose_landmarker_heavy.task",
                     delegate: "GPU"
@@ -70,7 +56,7 @@ const MediaPipeLoader = (() => {
 
             // Hand landmarker
             console.log("[MediaPipe] Loading hand model...");
-            handLandmarker = await window.HandLandmarker.createFromOptions(vision, {
+            handLandmarker = await HandLandmarker.createFromOptions(fileset, {
                 baseOptions: {
                     modelAssetPath: "/static/mediapipe/models/hand_landmarker.task",
                     delegate: "GPU"
@@ -93,11 +79,14 @@ const MediaPipeLoader = (() => {
     // CPU fallback
     async function initCPU() {
         try {
-            const vision = await window.FilesetResolver.forVisionTasks(
+            const vision = await import('/static/mediapipe/vision_bundle.mjs');
+            const { FilesetResolver, PoseLandmarker, HandLandmarker } = vision;
+
+            const fileset = await FilesetResolver.forVisionTasks(
                 "/static/mediapipe/wasm"
             );
 
-            poseLandmarker = await window.PoseLandmarker.createFromOptions(vision, {
+            poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
                 baseOptions: {
                     modelAssetPath: "/static/mediapipe/models/pose_landmarker_heavy.task",
                     delegate: "CPU"
@@ -106,7 +95,7 @@ const MediaPipeLoader = (() => {
                 numPoses: 1,
             });
 
-            handLandmarker = await window.HandLandmarker.createFromOptions(vision, {
+            handLandmarker = await HandLandmarker.createFromOptions(fileset, {
                 baseOptions: {
                     modelAssetPath: "/static/mediapipe/models/hand_landmarker.task",
                     delegate: "CPU"
@@ -122,20 +111,6 @@ const MediaPipeLoader = (() => {
             return false;
         }
     }
-
-    // Helper: load script dynamically
-    function loadScript(src) {
-        return new Promise((resolve, reject) => {
-            const s = document.createElement('script');
-            s.src = src;
-            s.crossOrigin = 'anonymous';
-            s.onload = () => { console.log("[MediaPipe] Dynamic script loaded:", src); resolve(); };
-            s.onerror = (e) => { console.error("[MediaPipe] Dynamic script failed:", src, e); reject(e); };
-            document.head.appendChild(s);
-        });
-    }
-
-    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     // =================================================================
     // Start camera and detection loop
