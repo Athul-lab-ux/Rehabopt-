@@ -26,9 +26,11 @@ class Config:
     WORKERS = int(os.environ.get("WORKERS", 4))
     
     # Security
+    SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "rehabopt_session")
     SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true"
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_PATH = os.environ.get("SESSION_COOKIE_PATH", "/")
     PERMANENT_SESSION_LIFETIME = 86400  # 24 hours
     
     # Upload limits
