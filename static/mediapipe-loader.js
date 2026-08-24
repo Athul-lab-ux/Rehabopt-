@@ -1,8 +1,7 @@
 /* ================================================================
    REHABOPT — mediapipe-loader.js
    Browser-side MediaPipe Pose + Hand landmark detection.
-   Self-hosted — no external CDN dependencies.
-   Uses dynamic import() for ES module vision_bundle.mjs
+   Self-hosted — uses RELATIVE paths so proxy prefix works.
    ================================================================ */
 
 const MediaPipeLoader = (() => {
@@ -22,21 +21,27 @@ const MediaPipeLoader = (() => {
         MIDDLE_TIP: 12, RING_TIP: 16, PINKY_TIP: 20,
     };
 
+    // Detect base URL from the script's own src (works with any proxy prefix)
+    // e.g. if loaded from /rehaboptt/static/mediapipe-loader.js -> BASE = /rehaboptt/static/
+    const SCRIPT_EL = document.currentScript || document.querySelector('script[src*="mediapipe-loader"]');
+    const BASE_URL = SCRIPT_EL ? SCRIPT_EL.src.replace(/\/[^\/]*$/, '/') : '/static/';
+
     // =================================================================
     // Initialize MediaPipe models using dynamic import
     // =================================================================
     async function init() {
         try {
             console.log("[MediaPipe] Initializing from self-hosted files...");
+            console.log("[MediaPipe] Base URL:", BASE_URL);
 
-            // Dynamically import the ES module
-            const vision = await import('/static/mediapipe/vision_bundle.mjs');
+            // Dynamically import the ES module (relative to this file)
+            const vision = await import(BASE_URL + 'mediapipe/vision_bundle.mjs');
             const { FilesetResolver, PoseLandmarker, HandLandmarker } = vision;
 
-            // Load WASM files from local server
+            // Load WASM files from local server (relative)
             console.log("[MediaPipe] Loading WASM...");
             const fileset = await FilesetResolver.forVisionTasks(
-                "/static/mediapipe/wasm"
+                BASE_URL + "mediapipe/wasm"
             );
             console.log("[MediaPipe] WASM loaded OK");
 
@@ -44,7 +49,7 @@ const MediaPipeLoader = (() => {
             console.log("[MediaPipe] Loading pose model...");
             poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
                 baseOptions: {
-                    modelAssetPath: "/static/mediapipe/models/pose_landmarker_heavy.task",
+                    modelAssetPath: BASE_URL + "mediapipe/models/pose_landmarker_heavy.task",
                     delegate: "GPU"
                 },
                 runningMode: "VIDEO",
@@ -58,7 +63,7 @@ const MediaPipeLoader = (() => {
             console.log("[MediaPipe] Loading hand model...");
             handLandmarker = await HandLandmarker.createFromOptions(fileset, {
                 baseOptions: {
-                    modelAssetPath: "/static/mediapipe/models/hand_landmarker.task",
+                    modelAssetPath: BASE_URL + "mediapipe/models/hand_landmarker.task",
                     delegate: "GPU"
                 },
                 runningMode: "VIDEO",
@@ -79,16 +84,16 @@ const MediaPipeLoader = (() => {
     // CPU fallback
     async function initCPU() {
         try {
-            const vision = await import('/static/mediapipe/vision_bundle.mjs');
+            const vision = await import(BASE_URL + 'mediapipe/vision_bundle.mjs');
             const { FilesetResolver, PoseLandmarker, HandLandmarker } = vision;
 
             const fileset = await FilesetResolver.forVisionTasks(
-                "/static/mediapipe/wasm"
+                BASE_URL + "mediapipe/wasm"
             );
 
             poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
                 baseOptions: {
-                    modelAssetPath: "/static/mediapipe/models/pose_landmarker_heavy.task",
+                    modelAssetPath: BASE_URL + "mediapipe/models/pose_landmarker_heavy.task",
                     delegate: "CPU"
                 },
                 runningMode: "VIDEO",
@@ -97,7 +102,7 @@ const MediaPipeLoader = (() => {
 
             handLandmarker = await HandLandmarker.createFromOptions(fileset, {
                 baseOptions: {
-                    modelAssetPath: "/static/mediapipe/models/hand_landmarker.task",
+                    modelAssetPath: BASE_URL + "mediapipe/models/hand_landmarker.task",
                     delegate: "CPU"
                 },
                 runningMode: "VIDEO",
