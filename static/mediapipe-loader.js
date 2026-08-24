@@ -39,7 +39,7 @@ const MediaPipeLoader = (() => {
 
             if (!hasFilesetResolver) {
                 console.error("[MediaPipe] vision_bundle.js not loaded! Trying dynamic load...");
-                await loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js");
+                await loadScript("/static/mediapipe/vision_bundle.mjs");
                 await sleep(1000);
                 if (typeof window.FilesetResolver === 'undefined') {
                     console.error("[MediaPipe] Still no FilesetResolver after dynamic load");
@@ -50,7 +50,7 @@ const MediaPipeLoader = (() => {
             // Load WASM files
             console.log("[MediaPipe] Loading WASM...");
             const vision = await window.FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+                "/static/mediapipe/wasm"
             );
             console.log("[MediaPipe] WASM loaded OK");
 
@@ -58,7 +58,7 @@ const MediaPipeLoader = (() => {
             console.log("[MediaPipe] Loading pose model...");
             poseLandmarker = await window.PoseLandmarker.createFromOptions(vision, {
                 baseOptions: {
-                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task",
+                    modelAssetPath: "/static/mediapipe/models/pose_landmarker_heavy.task",
                     delegate: "GPU"
                 },
                 runningMode: "VIDEO",
@@ -72,7 +72,7 @@ const MediaPipeLoader = (() => {
             console.log("[MediaPipe] Loading hand model...");
             handLandmarker = await window.HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
-                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                    modelAssetPath: "/static/mediapipe/models/hand_landmarker.task",
                     delegate: "GPU"
                 },
                 runningMode: "VIDEO",
@@ -94,12 +94,12 @@ const MediaPipeLoader = (() => {
     async function initCPU() {
         try {
             const vision = await window.FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+                "/static/mediapipe/wasm"
             );
 
             poseLandmarker = await window.PoseLandmarker.createFromOptions(vision, {
                 baseOptions: {
-                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task",
+                    modelAssetPath: "/static/mediapipe/models/pose_landmarker_heavy.task",
                     delegate: "CPU"
                 },
                 runningMode: "VIDEO",
@@ -108,7 +108,7 @@ const MediaPipeLoader = (() => {
 
             handLandmarker = await window.HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
-                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                    modelAssetPath: "/static/mediapipe/models/hand_landmarker.task",
                     delegate: "CPU"
                 },
                 runningMode: "VIDEO",
